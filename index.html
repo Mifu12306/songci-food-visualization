@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>舌尖上的宋词：宋代饮食文化数据可视化研究</title>
+  <!-- ECharts 核心库 & 中国地图插件 -->
+  <script src="./echarts.min.js"></script>
+  <script src="./china.js"></script>
+  <!-- 本地 data.js (第一段数据依赖) -->
+  <script src="./data.js"></script>
+  <script src="./region_data.js"></script>
+  <style>
+    :root {
+      --paper: #f4efe3;
+      --paper-deep: #e7dcc8;
+      --ink: #1f2522;
+      --muted: #6d675e;
+      --ru: #8fb8ad;
+      --ru-deep: #4f7f78;
+      --cinnabar: #a33a2d;
+      --gold: #b89658;
+      --line: rgba(31, 37, 34, .16);
+      --shadow: 0 16px 48px rgba(37, 34, 25, .12);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: "Noto Serif SC", "Songti SC", "Microsoft YaHei", serif;
+      /* 使用第二段代码的背景图 bg.jpg，同时保留原有宋代纹理层叠加 */
+      background: #f8f3e8 url("bg.jpg") no-repeat center center fixed;
+      background-size: cover;
+      background-attachment: fixed;
+      position: relative;
+    }
+
+    /* 半透柔光层让文字阅读更舒适，保留原有宋韵氛围 */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: rgba(248, 243, 232, 0.38);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .layout {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 248px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    aside {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 28px 18px;
+      border-right: 1px solid var(--line);
+      background: rgba(244, 239, 227, .86);
+      backdrop-filter: blur(10px);
+      overflow: auto;
+      z-index: 12;
+    }
+
+    .seal {
+      width: 54px;
+      height: 54px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 18px;
+      color: #fff;
+      background: var(--cinnabar);
+      font-family: "STKaiti", "KaiTi", serif;
+      line-height: 1.05;
+      box-shadow: inset 0 0 0 4px rgba(255,255,255,.2);
+    }
+
+    nav a {
+      display: block;
+      padding: 9px 10px;
+      margin: 2px 0;
+      color: var(--muted);
+      text-decoration: none;
+      border-left: 3px solid transparent;
+      font-size: 14px;
+      letter-spacing: 0;
+    }
+
+    nav a:hover, nav a.active {
+      color: var(--ink);
+      border-left-color: var(--cinnabar);
+      background: rgba(143, 184, 173, .14);
+    }
+
+    main { min-width: 0; }
+    section {
+      padding: 72px clamp(24px, 5vw, 72px);
+      border-bottom: 1px solid var(--line);
+      background: rgba(248, 243, 232, 0.2);
+      backdrop-filter: blur(2px);
+    }
+
+    .hero {
+      min-height: 92vh;
+      display: grid;
+      align-content: center;
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(180deg, rgba(244, 239, 227, 0.3), rgba(244, 239, 227, 0.85)),
+                  radial-gradient(ellipse at 48% 66%, rgba(31, 37, 34, .16), transparent 34rem);
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      left: 8%;
+      right: 5%;
+      bottom: 6%;
+      height: 46%;
+      opacity: .24;
+      background: linear-gradient(170deg, transparent 0 44%, rgba(31,37,34,.2) 45% 46%, transparent 49%),
+                  linear-gradient(162deg, transparent 0 54%, rgba(31,37,34,.16) 55% 56%, transparent 59%),
+                  radial-gradient(ellipse at 22% 70%, rgba(31,37,34,.2), transparent 18rem),
+                  radial-gradient(ellipse at 72% 64%, rgba(79,127,120,.42), transparent 20rem);
+      filter: blur(.2px);
+    }
+
+    .eyebrow {
+      color: var(--cinnabar);
+      font-weight: 700;
+      margin: 0 0 14px;
+    }
+
+    h1, h2, h3 {
+      margin: 0;
+      font-weight: 700;
+    }
+
+    h1 {
+      max-width: 980px;
+      font-family: "STKaiti", "KaiTi", "Songti SC", serif;
+      font-size: clamp(48px, 7vw, 104px);
+      line-height: 1.06;
+    }
+
+    h2 {
+      font-size: clamp(28px, 3vw, 44px);
+      font-family: "STKaiti", "KaiTi", "Songti SC", serif;
+      margin-bottom: 12px;
+    }
+
+    h3 {
+      font-size: 18px;
+      margin-bottom: 12px;
+    }
+
+    .lead {
+      max-width: 850px;
+      margin: 24px 0 0;
+      color: #3f413c;
+      font-size: 18px;
+      line-height: 1.9;
+    }
+
+    .section-head {
+      display: flex;
+      gap: 24px;
+      align-items: end;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 18px;
+    }
+
+    .cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    .card, .chart-card, .quote-card {
+      background: rgba(255, 252, 244, .78);
+      backdrop-filter: blur(4px);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .card { padding: 20px; }
+    .metric .value {
+      display: block;
+      margin-top: 10px;
+      color: var(--ru-deep);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 38px;
+      font-weight: 700;
+    }
+
+    .metric .label {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .chart-card { padding: 18px; min-height: 420px; }
+    .chart { width: 100%; height: 360px; }
+    .chart.tall { height: 500px; }
+    .chart.small { height: 300px; }
+
+    .insight {
+      border-left: 4px solid var(--cinnabar);
+      padding: 18px 20px;
+      color: #3c332d;
+      background: rgba(163, 58, 45, .07);
+      line-height: 1.8;
+      border-radius: 16px;
+    }
+
+    /* 词云 */
+    .word-cloud {
+      width: min(760px, 100%);
+      aspect-ratio: 1.38;
+      margin: 0 auto;
+      position: relative;
+      background: radial-gradient(ellipse at 50% 24%, rgba(244,239,227,.72) 0 10%, transparent 11%),
+                  radial-gradient(ellipse at 50% 56%, rgba(143,184,173,.3), rgba(79,127,120,.12) 58%, rgba(163,58,45,.08));
+      clip-path: polygon(42% 1%, 58% 1%, 61% 13%, 72% 19%, 84% 34%, 89% 56%, 83% 76%, 67% 91%, 50% 97%, 32% 91%, 16% 76%, 10% 56%, 15% 34%, 28% 19%, 39% 13%);
+      overflow: hidden;
+    }
+
+    .word-cloud span {
+      position: absolute;
+      color: var(--ink);
+      font-family: "STKaiti", "KaiTi", serif;
+      line-height: 1;
+      white-space: nowrap;
+      display: block;
+      transform-origin: center;
+      transform: translate(-50%, -50%);
+    }
+
+    .season-cards {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .season-card strong {
+      display: block;
+      color: var(--cinnabar);
+      font-size: 24px;
+      margin-bottom: 12px;
+    }
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .chip {
+      padding: 6px 9px;
+      border: 1px solid rgba(79, 127, 120, .26);
+      background: rgba(143, 184, 173, .13);
+      border-radius: 999px;
+      font-size: 13px;
+      color: #314f4a;
+    }
+
+    /* ========= 地域模块：地图容器样式（第二段风格融合） ========= */
+    .region-map-wrapper {
+      position: relative;
+      background: rgba(248, 243, 232, 0.68);
+      backdrop-filter: blur(4px);
+      border-radius: 28px;
+      border: 1px solid rgba(211, 196, 169, 0.6);
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .map-full {
+      width: 100%;
+      height: 560px;
+    }
+
+    /* 侧边弹窗 —— 点击省份后显示，不复原滚动隐藏逻辑，只在点击时出现 */
+    #info-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 340px;
+      max-height: 90%;
+      overflow-y: auto;
+      background: rgba(255, 253, 248, 0.98);
+      backdrop-filter: blur(12px);
+      border-left: 4px solid #b08e7c;
+      border-radius: 24px;
+      padding: 20px 16px;
+      box-shadow: 0 12px 28px rgba(0,0,0,0.28);
+      z-index: 30;
+      transition: all 0.25s ease;
+      font-family: "Noto Serif SC", "微软雅黑", sans-serif;
+      display: none; /* 默认隐藏，点击省份后显示 */
+    }
+    #info-panel.show {
+      display: block;
+      animation: fadeSlide 0.25s ease;
+    }
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .panel-close-btn {
+      position: absolute;
+      top: 12px;
+      right: 16px;
+      background: none;
+      border: none;
+      font-size: 26px;
+      cursor: pointer;
+      color: #8e6454;
+      transition: color 0.2s;
+      font-weight: bold;
+      line-height: 1;
+    }
+    .panel-close-btn:hover { color: #a33a2d; }
+    #province-img {
+      width: 100%;
+      height: 160px;
+      object-fit: cover;
+      border-radius: 16px;
+      border: 1px solid #d3c4a9;
+      margin-bottom: 12px;
+    }
+    #panel-title {
+      font-size: 24px;
+      font-weight: bold;
+      color: #5b3426;
+      text-align: center;
+      font-family: "KaiTi", serif;
+    }
+    .info-item {
+      margin: 12px 0;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+    .info-label {
+      font-weight: bold;
+      color: #8e6454;
+    }
+    #total-count {
+      font-size: 26px;
+      font-weight: bold;
+      color: #a33a2d;
+    }
+    #word-chart {
+      width: 100%;
+      height: 200px;
+      margin-top: 6px;
+    }
+    .sub-title {
+      font-size: 16px;
+      font-weight: bold;
+      color: #5b3426;
+      text-align: center;
+      margin: 12px 0 6px;
+      font-family: KaiTi;
+    }
+    .poem-wrap {
+      background: #f6f0e8;
+      border-left: 4px solid #b08e7c;
+      padding: 10px;
+      border-radius: 12px;
+      margin-bottom: 12px;
+    }
+    .poem-name { font-weight: bold; text-align: center; font-size: 15px; }
+    .poem-author { text-align: center; font-size: 13px; color: #7b5a4a; }
+    .poem-content {
+      font-size: 13px;
+      line-height: 1.8;
+      white-space: normal;
+      word-break: break-word;
+      margin-top: 8px;
+      text-align: justify;
+    }
+    .hide { display: none !important; }
+    .empty-tip { text-align: center; padding: 20px; color: #8e6454; }
+
+    .searchbar {
+      display: grid;
+      grid-template-columns: 1fr 120px;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    input, button {
+      height: 42px;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      font: inherit;
+    }
+    input {
+      padding: 0 14px;
+      background: rgba(255, 252, 244, .8);
+    }
+    button {
+      background: var(--ink);
+      color: var(--paper);
+      cursor: pointer;
+    }
+    .results {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .result-card {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 252, 244, .72);
+    }
+    mark {
+      background: rgba(163, 58, 45, .18);
+      color: var(--cinnabar);
+      padding: 0 2px;
+    }
+    footer {
+      padding: 44px clamp(24px, 5vw, 72px);
+      color: var(--muted);
+      text-align: center;
+    }
+
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+      aside { position: static; height: auto; border-bottom: 1px solid var(--line); }
+      nav { display: flex; overflow-x: auto; gap: 4px; }
+      nav a { white-space: nowrap; border-left: 0; border-bottom: 3px solid transparent; }
+      .cols-4, .cols-3, .cols-2, .season-cards, .results { grid-template-columns: 1fr; }
+      section { padding: 52px 18px; }
+      .map-full { height: 460px; }
+      #info-panel { position: fixed; top: 10%; right: 5%; left: 5%; width: auto; max-height: 80%; }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <div class="seal">宋<br>味</div>
+    <nav id="nav">
+      <a href="#overview">研究概览</a>
+      <a href="#corpus">总体概况</a>
+      <a href="#food">饮食词总览</a>
+      <a href="#wine">酒文化专题</a>
+      <a href="#emotion">饮食与情感</a>
+      <a href="#season">饮食与季节</a>
+      <a href="#region">饮食与地域</a>
+      <a href="#triad">三类共现</a>
+      <a href="#author">作者相关</a>
+      <a href="#search">原文检索</a>
+      <a href="#ending">结语</a>
+    </nav>
+  </aside>
+
+  <main>
+    <!-- 英雄区 -->
+    <section class="hero" id="overview">
+      <h1>舌尖上的宋词</h1>
+      <p class="lead">以《全宋词》饮食词、情感词与季节词数据为线索，观察酒、茶、羹、果、器具与节令如何进入词人的日常、宴饮、离愁与风雅。</p>
+      <div class="grid cols-4" style="margin-top: 40px;">
+        <div class="card metric"><span class="label">涉及饮食词的词作数</span><span class="value" id="mFoodPoems"></span></div>
+        <div class="card metric"><span class="label">作者数量</span><span class="value" id="mFoodAuthors"></span></div>
+        <div class="card metric"><span class="label">词牌名数量</span><span class="value" id="mFoodRhythmics"></span></div>
+        <div class="card metric"><span class="label">饮食词命中次数</span><span class="value" id="mFoodHits"></span></div>
+      </div>
+    </section>
+
+    <section id="corpus">
+      <div class="section-head"><p class="eyebrow">一、全宋词总体数据概况</p><h2>从词集规模到饮食覆盖</h2></div>
+      <div class="grid cols-4">
+        <div class="card metric"><span class="label">全宋词词作数</span><span class="value" id="mTotalPoems"></span></div>
+        <div class="card metric"><span class="label">全宋词作者数</span><span class="value" id="mTotalAuthors"></span></div>
+        <div class="card metric"><span class="label">全宋词词牌名数</span><span class="value" id="mTotalRhythmics"></span></div>
+        <div class="card metric"><span class="label">饮食词覆盖占比</span><span class="value" id="mCoverage"></span></div>
+      </div>
+    </section>
+
+    <section id="food">
+      <div class="section-head"><p class="eyebrow">二、饮食词总览</p></div>
+      <div class="grid cols-2">
+        <div class="chart-card"><h3>饮食一级大类</h3><div class="chart" id="sunburst"></div></div>
+        <div class="chart-card"><h3 id="categoryDetailTitle">二级大类与 Top10 饮食词</h3><div class="chart" id="topTerms"></div></div>
+      </div>
+      <div class="chart-card" style="margin-top: 18px;"><h3>饮食词云</h3><div class="word-cloud" id="wordCloud"></div></div>
+    </section>
+
+    <section id="wine">
+      <div class="section-head"><p class="eyebrow">三、酒文化专题</p></div>
+      <div class="grid cols-2">
+        <div class="chart-card"><h3>酒的种类</h3><div class="chart" id="wineRose"></div></div>
+        <div class="chart-card"><h3>酒器 Top10</h3><div class="chart" id="wineVessel"></div></div>
+        <div class="chart-card"><h3>写酒次数 Top10 作者</h3><div class="chart" id="wineAuthors"></div></div>
+        <div class="chart-card"><h3>写酒次数 Top10 词牌名</h3><div class="chart" id="wineRhythmics"></div></div>
+      </div>
+    </section>
+
+    <section id="emotion">
+      <div class="section-head"><p class="eyebrow">四、饮食与情感关系</p></div>
+      <div class="grid cols-2">
+        <div class="chart-card"><h3>酒文化 Top15 词与情感共现</h3><div class="chart small" id="emotionFocus"></div></div>
+        <div class="chart-card"><h3>非酒文化 Top15 饮食词与情感共现</h3><div class="chart small" id="nonwineEmotionFocus"></div></div>
+        <div class="chart-card"><h3>酒文化饮食词与情感词共现网络</h3><div class="chart tall" id="wineEmotionGraph"></div></div>
+        <div class="chart-card"><h3>非酒文化饮食词与情感词共现网络</h3><div class="chart tall" id="nonwineEmotionGraph"></div></div>
+      </div>
+    </section>
+
+    <section id="season">
+      <div class="section-head"><p class="eyebrow">五、饮食与季节关系</p><h2>四时风物中的饮食</h2></div>
+      <div class="chart-card"><h3>饮食词与季节词共现热力图</h3><div class="chart" id="seasonHeatmap"></div></div>
+      <div class="grid season-cards" id="seasonCards" style="margin-top: 18px;"></div>
+    </section>
+
+    <!-- 饮食与地域：嵌入第二段中国地图 + 点击显示侧边栏 (完全保留配色与结构) -->
+    <section id="region">
+      <div class="section-head">
+        <p class="eyebrow">六、饮食与地域关系</p>
+        <h2>词里山河 · 风物食俗</h2>
+      </div>
+      <div class="region-map-wrapper">
+        <div id="china-map" class="map-full"></div>
+        <!-- 侧边弹窗: 点击省份后动态显示 -->
+        <div id="info-panel">
+          <button class="panel-close-btn" id="closePanelBtn">&times;</button>
+          <img id="province-img" src="" alt="地标">
+          <div id="panel-title">江苏省</div>
+          <div class="info-item"><span class="info-label">饮食相关宋词数量：</span><span id="total-count">0</span> 首</div>
+          <div class="sub-title" id="wordChartTitle">该地区饮食共现词</div>
+          <div id="word-chart"></div>
+          <div class="sub-title" id="poemTitle">该地区代表词作</div>
+          <div id="poem-list"></div>
+        </div>
+      </div>
+      <div class="insight" style="margin-top: 20px;">
+        📜 点击地图任一省份，右侧浮现饮食文化窗：展示该省饮食相关宋词数量、高频共现词及代表性词句。酒、鲈鱼、莼菜、茶与宴饮踪迹遍布山河。
+      </div>
+    </section>
+
+    <section id="triad">
+      <div class="section-head"><p class="eyebrow">七、饮食、情感、季节共现关系</p><h2>食物、心绪与四时的网络</h2></div>
+      <div class="chart-card"><h3>饮食词 → 情感用词 → 季节桑基图</h3><div class="chart tall" id="triSankey"></div></div>
+    </section>
+
+    <section id="author">
+      <div class="section-head"><p class="eyebrow">八、作者与饮食、情感、季节关系</p><h2>谁最常在词中书写饮食</h2></div>
+      <div class="grid cols-2">
+        <div class="chart-card"><h3>饮食词频 Top5 作者</h3><div class="chart small" id="topAuthors"></div></div>
+        <div class="chart-card"><h3>作者 → 饮食词 → 情感类别</h3><div class="chart small" id="sankey"></div></div>
+      </div>
+      <div class="chart-card"><h3>作者 → 季节 → 饮食词</h3><div class="chart tall" id="authorSeasonSankey"></div></div>
+    </section>
+
+    <section id="search">
+      <div class="section-head"><p class="eyebrow">九、原文检索与词句卡片</p></div>
+      <div class="searchbar"><input id="query" placeholder="输入饮食词、作者或词牌名，如：酒、苏轼、水调歌头"><button id="searchBtn">检索</button></div>
+      <div class="results" id="results"></div>
+    </section>
+
+    <section id="ending">
+      <div class="section-head"><p class="eyebrow">十、结语</p><h2>以数据重读宋词风味</h2></div>
+      <div class="insight">从整体覆盖看，饮食词并非宋词里的边缘素材，而是进入大量词作的文化线索。它既记录酒器、茶饮、果蔬、烹饪等生活细节，也与宴饮、节令、离别、怀人、伤春悲秋等情感结构相连。数据可视化让这些分散在词句中的“味道”重新聚合：既可见宋代饮食文化的物质面貌，也可见词人借饮食书写时间、空间与心绪的方式。</div>
+    </section>
+    <footer>数据来源：《全宋词》及饮食标注。地图地域模块基于各省饮食词频统计。点击省份查看详情。</footer>
+  </main>
+</div>
+
+<script>
+  // ========= 第一部分：原有图表数据依赖 (data.js) =========
+  const D = window.SONGCI_FOOD_DATA;
+  if(!D) console.warn("未找到 data.js，请确保文件和变量SONGCI_FOOD_DATA存在");
+  const fmt = n => Number(n).toLocaleString("zh-CN");
+  function setText(id,val){ let el=document.getElementById(id); if(el) el.textContent=val; }
+  if(D){
+    setText("mFoodPoems", fmt(D.overview.foodPoems));
+    setText("mFoodAuthors", fmt(D.overview.foodAuthors));
+    setText("mFoodRhythmics", fmt(D.overview.foodRhythmics));
+    setText("mFoodHits", fmt(D.overview.foodHits));
+    setText("mTotalPoems", fmt(D.overview.totalPoems));
+    setText("mTotalAuthors", fmt(D.overview.totalAuthors));
+    setText("mTotalRhythmics", fmt(D.overview.totalRhythmics));
+    setText("mCoverage", D.overview.coverage + "%");
+  }
+  const chartText = { color: "#1f2522", fontFamily: "Noto Serif SC, Songti SC, Microsoft YaHei, serif" };
+  function initChart(id, option) { let dom=document.getElementById(id); if(!dom) return; let chart=echarts.init(dom); chart.setOption(option); window.addEventListener("resize",()=>chart.resize()); return chart; }
+  if(D){
+    const categoryChart = initChart("sunburst", {
+      color:["#4f7f78","#a33a2d","#b89658","#8fb8ad"],
+      tooltip:{trigger:"item",formatter:"{b}<br/>命中次数：{c}"},
+      series:[{
+        type:"pie",
+        radius:["46%","78%"],
+        data:D.categoryDonut,
+        label:chartText,
+        emphasis:{scale:true,focus:"self"}
+      }]
+    });
+    const catDetail = echarts.init(document.getElementById("topTerms"));
+    const renderDetail = (name)=>{ let sel = name || D.categoryDonut[0]?.name; document.getElementById("categoryDetailTitle").innerHTML = `${sel}：二级大类与 Top10 饮食词`; catDetail.setOption({series:[{type:"sunburst",data:D.categorySunbursts[sel]||[],radius:[0,"92%"]}]}); };
+    renderDetail();
+    categoryChart?.on("click", params => { if(params.name) renderDetail(params.name); });
+    // 词云：按词频缩放，并用螺旋排布减少重叠。
+    const maxWord = Math.max(...D.wordCloud.map(d=>d.value));
+    const cloudDiv=document.getElementById("wordCloud");
+    function renderWordCloud(){
+      if(!cloudDiv) return;
+      cloudDiv.innerHTML = "";
+      const rect = cloudDiv.getBoundingClientRect();
+      const placed = [];
+      const colors = ["#4f7f78","#a33a2d","#b89658","#263f4d","#7e8f62"];
+      const centerX = rect.width / 2, centerY = rect.height / 2;
+      const hit = (a,b) => !(a.x+a.w < b.x || b.x+b.w < a.x || a.y+a.h < b.y || b.y+b.h < a.y);
+      D.wordCloud.slice(0, 72).forEach((d,i)=>{
+        const sp=document.createElement("span");
+        const size=14+Math.sqrt(d.value/maxWord)*50;
+        const rotate=[0,0,0,-28,28,90][i%6];
+        sp.style.fontSize=size+"px";
+        sp.style.color=colors[i%colors.length];
+        sp.style.opacity=0.58+0.34*(d.value/maxWord);
+        sp.style.left=centerX+"px";
+        sp.style.top=centerY+"px";
+        sp.style.transform=`translate(-50%, -50%) rotate(${rotate}deg)`;
+        sp.innerText=d.name;
+        cloudDiv.appendChild(sp);
+        const box = sp.getBoundingClientRect();
+        let w = box.width + 8, h = box.height + 8, found = null;
+        for(let t=0; t<460 && !found; t++){
+          const angle = t * 0.48 + i * 0.72;
+          const radius = 4 + t * 2.1;
+          const x = centerX + Math.cos(angle) * radius;
+          const y = centerY + Math.sin(angle) * radius * 0.68;
+          const candidate = {x:x-w/2, y:y-h/2, w, h};
+          const inside = candidate.x > 18 && candidate.y > 18 && candidate.x + w < rect.width - 18 && candidate.y + h < rect.height - 18;
+          if(inside && !placed.some(p=>hit(candidate,p))) found = {x,y,box:candidate};
+        }
+        if(!found){
+          const x = 40 + ((i * 67) % Math.max(80, rect.width - 80));
+          const y = 40 + ((i * 43) % Math.max(80, rect.height - 80));
+          found = {x,y,box:{x:x-w/2,y:y-h/2,w,h}};
+        }
+        placed.push(found.box);
+        sp.style.left=found.x+"px";
+        sp.style.top=found.y+"px";
+      });
+    }
+    requestAnimationFrame(renderWordCloud);
+    window.addEventListener("resize", renderWordCloud);
+    initChart("wineRose", {series:[{type:"pie",roseType:"radius",data:D.wineKindTop}]});
+    initChart("wineVessel", {
+      grid:{left:70,right:42,top:28,bottom:34},
+      tooltip:{trigger:"axis",axisPointer:{type:"shadow"}},
+      xAxis:{type:"value",splitLine:{lineStyle:{color:"rgba(79,127,120,.18)"}}},
+      yAxis:{type:"category",inverse:true,data:D.wineVesselTop.map(d=>d.name),axisTick:{show:false}},
+      series:[
+        {type:"bar",barWidth:4,data:D.wineVesselTop.map(d=>d.value),itemStyle:{color:"#4f7f78",borderRadius:4},z:1},
+        {type:"scatter",symbolSize:18,data:D.wineVesselTop.map((d,i)=>[d.value,i]),itemStyle:{color:"#b89658",borderColor:"#fff",borderWidth:2},z:3}
+      ]
+    });
+    function barChart(id,data,color){ initChart(id,{xAxis:{type:"value"},yAxis:{type:"category",inverse:true,data:data.map(d=>d.name)},series:[{type:"bar",data:data.map(d=>d.value),itemStyle:{color}}]}); }
+    barChart("wineAuthors", D.wineAuthorTop, "#4f7f78"); barChart("wineRhythmics", D.wineRhythmicTop, "#b89658"); barChart("topAuthors", D.top5Authors, "#9f7868");
+    function heatmapChart(id,matrix,colors){
+      initChart(id,{
+        grid:{left:76,right:28,top:28,bottom:82},
+        tooltip:{position:"top"},
+        xAxis:{type:"category",data:matrix.x,axisTick:{show:false}},
+        yAxis:{type:"category",data:matrix.y,axisTick:{show:false}},
+        visualMap:{
+          min:0,
+          max:Math.max(...matrix.data.map(v=>v[2])),
+          orient:"horizontal",
+          left:"center",
+          bottom:6,
+          text:["高","低"],
+          calculable:true,
+          inRange:{color:colors || ["#e9ecc2","#dca579","#b6485c"]}
+        },
+        series:[{type:"heatmap",data:matrix.data,emphasis:{itemStyle:{borderColor:"#fff",borderWidth:1}}}]
+      });
+    }
+    heatmapChart("emotionFocus", D.wineEmotionMatrix, ["#e8edc7","#c9b39e","#a94b68"]);
+    heatmapChart("nonwineEmotionFocus", D.nonwineEmotionMatrix, ["#eef1bd","#e3b178","#bf3f4b"]);
+    
+    function graphFromMatrix(matrix, foodCategoryName){
+      const weights = {};
+      const links = matrix.data.map(([x,y,value])=>{
+        const food = matrix.y[y], emotion = matrix.x[x];
+        weights[food] = (weights[food] || 0) + value;
+        weights[emotion] = (weights[emotion] || 0) + value;
+        return {source:food,target:emotion,value};
+      });
+      const nodes = Object.entries(weights).map(([name,value])=>({
+        name,
+        value,
+        category: matrix.x.includes(name) ? "情感类别" : foodCategoryName
+      }));
+      return {nodes, links};
+    }
+    const nonwineEmotionGraph = graphFromMatrix(D.nonwineEmotionMatrix, "非酒文化饮食词");
+    function emotionGraphOption(graph, foodCategoryName){
+      return {
+      tooltip:{formatter: p => p.dataType === "edge" ? `${p.data.source} → ${p.data.target}<br/>共现 ${p.data.value}` : `${p.name}<br/>${p.data.category || ""}`},
+      legend:{top:6,data:[foodCategoryName,"情感类别"],textStyle:chartText},
+      series:[{
+        type:"graph",
+        layout:"force",
+        categories:[{name:foodCategoryName,itemStyle:{color:"#4f7f78"}},{name:"情感类别",itemStyle:{color:"#a33a2d"}}],
+        data:graph.nodes.map(n=>({
+          ...n,
+          symbolSize:Math.max(34, Math.min(78, 22 + Math.sqrt(n.value) * 1.2)),
+          itemStyle:{color:n.category==="情感类别" ? "#a33a2d" : "#4f7f78"}
+        })),
+        links:graph.links,
+        emphasis:{
+          focus:"adjacency",
+          lineStyle:{width:3,opacity:.9}
+        },
+        blur:{itemStyle:{opacity:.16},lineStyle:{opacity:.06},label:{opacity:.16}},
+        label:{
+          show:true,
+          position:"inside",
+          color:"#fff",
+          fontSize:10,
+          fontWeight:700,
+          formatter:p=>p.name
+        },
+        lineStyle:{color:"rgba(79,127,120,.34)",width:1,curveness:.12},
+        force: {
+          repulsion: 600,
+          gravity: 0.2,
+          edgeLength: 180,
+          layoutAnimation: true
+        },
+        nodeScaleRatio: 0.4,
+        roam: true
+      }]
+      };
+    }
+    initChart("wineEmotionGraph", emotionGraphOption(D.wineEmotionGraph, "酒文化饮食词"));
+    initChart("nonwineEmotionGraph", emotionGraphOption(nonwineEmotionGraph, "非酒文化饮食词"));
+
+    initChart("seasonHeatmap", {
+      grid:{left:76,right:28,top:30,bottom:86},
+      tooltip:{position:"top"},
+      xAxis:{type:"category",data:D.seasonHeatmap.x,axisTick:{show:false}},
+      yAxis:{type:"category",data:D.seasonHeatmap.y,axisTick:{show:false}},
+      visualMap:{
+        min:0,
+        max:Math.max(...D.seasonHeatmap.data.map(v=>v[2])),
+        orient:"horizontal",
+        left:"center",
+        bottom:6,
+        text:["高频","低频"],
+        calculable:true,
+        inRange:{color:["#edf4e0","#c8ddb8","#93bb94","#4f7f78"]}
+      },
+      series:[{type:"heatmap",data:D.seasonHeatmap.data,emphasis:{itemStyle:{borderColor:"#fff",borderWidth:1}}}]
+    });
+    const seasonDiv=document.getElementById("seasonCards"); if(seasonDiv)["春","夏","秋","冬"].forEach(s=>{ let c=document.createElement("div");c.className="card season-card";c.innerHTML=`<strong>${s}</strong><div class="chips">${(D.seasonCards[s]||[]).map(t=>`<span class="chip">${t.name} ${t.value}</span>`).join("")}</div>`; seasonDiv.appendChild(c);});
+    const emotionNames = new Set([...(D.wineEmotionMatrix.x || []), ...(D.nonwineEmotionMatrix.x || [])]);
+    const seasonsSet = new Set(["春","夏","秋","冬","季:春","季:夏","季:秋","季:冬"]);
+    const seasonColors = {"春":"#8fbf7f","夏":"#4f9d93","秋":"#b89658","冬":"#7c93a8"};
+    function sankeyNodeColor(name, kind){
+      const clean = name.replace(/^食:|^情:|^季:/, "");
+      if(seasonsSet.has(name) || seasonsSet.has(clean)) return seasonColors[clean] || "#7c93a8";
+      if(name.startsWith("情:") || emotionNames.has(name) || emotionNames.has(clean)) return "#a33a2d";
+      if(kind === "author" && D.top5Authors.some(d=>d.name === name)) return "#9f7868";
+      return "#4f7f78";
+    }
+    function colorSankeyNodes(nodes, kind){
+      return nodes.map(n=>({...n,itemStyle:{color:sankeyNodeColor(n.name, kind),borderColor:"rgba(255,252,244,.8)",borderWidth:1}}));
+    }
+    const sankeyFocus = {
+      type:"sankey",
+      emphasis:{focus:"adjacency"},
+      blur:{itemStyle:{opacity:.16},lineStyle:{opacity:.08},label:{opacity:.18}},
+      lineStyle:{color:"source",curveness:.5,opacity:.28}
+    };
+    initChart("sankey",{series:[{...sankeyFocus,data:colorSankeyNodes(D.sankey.nodes,"author"),links:D.sankey.links}]});
+    initChart("triSankey",{series:[{...sankeyFocus,data:colorSankeyNodes(D.triSankey.nodes,"triad"),links:D.triSankey.links}]});
+    initChart("authorSeasonSankey",{series:[{...sankeyFocus,data:colorSankeyNodes(D.authorSeasonSankey.nodes,"authorSeason"),links:D.authorSeasonSankey.links,label:{formatter:p=>p.name.replace(/^季:/,"")}}]});
+    const searchBtn=document.getElementById("searchBtn"); const queryInp=document.getElementById("query");
+    const renderResults=(q)=>{ let pool=q? D.poems.filter(p=>p.author.includes(q)||p.rhythmic.includes(q)||p.terms.some(t=>t.includes(q))||p.text.includes(q)): D.poems.slice(0,6); document.getElementById("results").innerHTML=pool.slice(0,6).map(p=>`<article class="result-card"><h4>${p.author}《${p.rhythmic}》</h4><div class="chips">${p.terms.slice(0,6).map(t=>`<span class="chip">${t}</span>`).join("")}</div><p>${p.text.substring(0,140)}…</p></article>`).join(""); };
+    searchBtn?.addEventListener("click",()=>renderResults(queryInp.value)); renderResults("");
+  }
+
+  // ========= 第二段：中国地图 + 点击省份侧边栏（只在地图内显示，点击后出现） =========
+  const regionSource = window.SONGCI_REGION_DATA || {};
+  const chinaProvinceNames = ['北京','天津','河北','山西','内蒙古','辽宁','吉林','黑龙江','上海','江苏','浙江','安徽','福建','江西','山东','河南','湖北','湖南','广东','广西','海南','重庆','四川','贵州','云南','西藏','陕西','甘肃','青海','宁夏','新疆','香港','澳门','台湾'];
+  const provinceData = chinaProvinceNames.map(name => ({
+    name,
+    value: regionSource[name]?.value || 0,
+    sentence: regionSource[name]?.sentence || ""
+  }));
+
+  const mapChart = echarts.init(document.getElementById('china-map'));
+  const wordChartMini = echarts.init(document.getElementById('word-chart'));
+  let selectedProvince = "";
+  mapChart.setOption({
+    title: { text: '各省份饮食相关宋词数量热力分布', left: 'center', textStyle: { fontSize: 20, color: '#2c2416', fontFamily: "楷体" } },
+    tooltip: { trigger: 'item', formatter: params => { let it=provinceData.find(d=>d.name===params.name); return it?`${params.name}<br/>数量:${it.value}首<br/>${it.sentence||''}`:`${params.name}`; } },
+    visualMap: { type: 'piecewise', pieces: [{min:0,max:1,color:'#f9f3ee'},{min:2,max:10,color:'#e9d4c2'},{min:11,max:30,color:'#dfc2ab'},{min:31,max:100,color:'#c1a390'},{min:101,max:200,color:'#9f7868'},{min:201,color:'#5b3426'}] },
+    series: [{ type: 'map', mapType: 'china', selectedMode: 'single', data: provinceData, label: { show: true, fontSize: 10 }, itemStyle: { borderColor: '#b8a98f' }, select:{itemStyle:{areaColor:'#8e6454',borderColor:'#5b3426',borderWidth:1.5}} }]
+  });
+
+  const panel = document.getElementById('info-panel');
+  const closePanelBtn = document.getElementById('closePanelBtn');
+  const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  function showProvinceInfo(name){
+    let data = provinceData.find(i=>i.name===name) || {value:0,name:name};
+    let extra = regionSource[name] || {img:'江苏.png', words:[], poems:[]};
+    let empty = data.value===0;
+    const provinceImg = document.getElementById('province-img');
+    provinceImg.onerror = () => {
+      provinceImg.onerror = null;
+      provinceImg.src = 'bg.jpg';
+    };
+    provinceImg.src = extra.img || '江苏.png';
+    document.getElementById('panel-title').innerText = data.name;
+    document.getElementById('total-count').innerText = data.value;
+    if(empty || !extra.words?.length){
+      document.getElementById('word-chart').classList.add('hide');
+      document.getElementById('wordChartTitle').classList.add('hide');
+    } else {
+      document.getElementById('word-chart').classList.remove('hide');
+      document.getElementById('wordChartTitle').classList.remove('hide');
+      const words = [...extra.words];
+      wordChartMini.setOption({
+        tooltip:{trigger:'axis',axisPointer:{type:'shadow'}},
+        grid:{top:18,bottom:46,left:28,right:18,width:'72%'},
+        xAxis:{type:'category',data:words.map(d=>d.name),axisTick:{show:false},axisLabel:{interval:0,rotate:0,fontSize:11,overflow:'break',width:36}},
+        yAxis:{type:'value',splitLine:{lineStyle:{color:'rgba(176,142,124,.18)'}}},
+        series:[{data:words.map(d=>d.value),type:'bar',barMaxWidth:24,itemStyle:{color:'#9f7868',borderRadius:[6,6,0,0]},label:{show:true,position:'top',color:'#5b3426'}}]
+      });
+    }
+    if(empty || !extra.poems?.length){
+      document.getElementById('poemTitle').classList.add('hide');
+      document.getElementById('poem-list').innerHTML = '<div class="empty-tip">暂无详细饮食词作</div>';
+    } else {
+      document.getElementById('poemTitle').classList.remove('hide');
+      let poemsHtml = '';
+      const p = extra.poems[0];
+      poemsHtml+=`<div class="poem-wrap">
+          <div class="poem-name">${escapeHtml(p.rhythmic)}${p.id ? ` <span style="font-size:12px;color:#8e6454;">#${p.id}</span>` : ""}</div>
+          <div class="poem-author">${escapeHtml(p.author)}</div>
+          ${p.regionTerms ? `<div class="chips" style="justify-content:center;margin-top:6px;"><span class="chip">${escapeHtml(p.regionTerms)}</span></div>` : ""}
+          <div class="poem-content">${escapeHtml(p.text)}</div>
+        </div>`;
+      document.getElementById('poem-list').innerHTML = poemsHtml;
+    }
+    panel.classList.add('show');
+    selectedProvince = name;
+    mapChart.dispatchAction({type:'mapUnSelect', seriesIndex:0});
+    mapChart.dispatchAction({type:'mapSelect', seriesIndex:0, name});
+  }
+  function closePanel(){
+    panel.classList.remove('show');
+    if(selectedProvince) mapChart.dispatchAction({type:'mapUnSelect', seriesIndex:0, name:selectedProvince});
+    selectedProvince = "";
+  }
+  mapChart.on('click', params => {
+    if(params.name) showProvinceInfo(params.name);
+    else closePanel();
+  });
+  mapChart.getZr().on('click', event => {
+    if(!event.target) closePanel();
+  });
+  closePanelBtn.addEventListener('click', closePanel);
+  document.addEventListener('click', event => {
+    if(!panel.classList.contains('show')) return;
+    if(event.target.closest('#info-panel') || event.target.closest('#china-map')) return;
+    closePanel();
+  });
+
+  // 导航高亮
+  const links=document.querySelectorAll("nav a"), sections=Array.from(links).map(a=>document.querySelector(a.getAttribute("href")));
+  const obs=new IntersectionObserver(entries=>{entries.forEach(entry=>{if(entry.isIntersecting)links.forEach(link=>link.classList.toggle("active",link.getAttribute("href")==="#"+entry.target.id));});},{rootMargin:"-40% 0px -40% 0px",threshold:0.2});
+  sections.forEach(s=>obs.observe(s));
+</script>
+</body>
+</html>
